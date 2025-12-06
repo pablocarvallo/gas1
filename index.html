@@ -8,8 +8,6 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Gas Tracker">
-    <!-- El usuario especificó 'gas.png' como icono. Esto es cómo se referencia en la PWA. -->
-    <link rel="apple-touch-icon" href="gas.png">
     <link rel="icon" href="gas.png">
     
     <!-- Tailwind CSS CDN para un estilo limpio y adaptable -->
@@ -50,7 +48,7 @@
         <!-- Sección de Balón de Gas Actual (Activo) -->
         <div id="active-tank-container" class="ios-card p-4 mb-6">
             <h2 class="text-2xl font-semibold mb-3 text-gray-800 flex items-center">
-                <span class="mr-2"></span>Balón actual
+                Balón actual
             </h2>
             <div id="active-tank-display">
                 <!-- Se llenará con la info del balón activo o un mensaje -->
@@ -60,7 +58,7 @@
 
         <!-- Formulario para Nuevo Balón -->
         <div class="ios-card p-4 mb-6">
-            <h2 class="text-2xl font-semibold mb-3 text-gray-800">🧺 Nuevo balón</h2>
+            <h2 class="text-2xl font-semibold mb-3 text-gray-800">Nuevo balón</h2>
             <form id="new-tank-form" class="space-y-4">
                 <div>
                     <label for="purchaseDate" class="block text-sm font-medium text-gray-700 mb-1">Fecha de compra</label>
@@ -68,7 +66,7 @@
                            class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
                 </div>
                 <div>
-                    <label for="openDate" class="block text-sm font-medium text-gray-700 mb-1">Fecha de apertura (Uso)</label>
+                    <label for="openDate" class="block text-sm font-medium text-gray-700 mb-1">Fecha de apertura (uso)</label>
                     <input type="date" id="openDate" required 
                            class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
                 </div>
@@ -81,7 +79,7 @@
 
         <!-- Historial de Registros -->
         <div class="ios-card p-4">
-            <h2 class="text-2xl font-semibold mb-4 text-gray-800">📚 Historial de uso</h2>
+            <h2 class="text-2xl font-semibold mb-4 text-gray-800">Historial de uso</h2>
             <div id="history-list" class="space-y-3">
                 <!-- Se llenará con los registros históricos -->
                 <p class="text-gray-500 italic">El historial aparecerá aquí.</p>
@@ -92,7 +90,7 @@
     <!-- Modal de Confirmación para Borrar -->
     <div id="delete-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center p-4 z-50">
         <div class="ios-card p-6 w-full max-w-sm">
-            <h3 class="text-xl font-semibold mb-4">Confirmar Eliminación</h3>
+            <h3 class="text-xl font-semibold mb-4">Confirmar eliminación</h3>
             <p class="text-gray-700 mb-6">¿Estás seguro de que quieres eliminar este registro histórico?</p>
             <div class="flex justify-end space-x-3">
                 <button id="cancel-delete-btn" class="ios-button px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">
@@ -106,29 +104,10 @@
     </div>
 
 
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, addDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, limit, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Establecer nivel de log a Debug para ver logs de Firestore
-        setLogLevel('Debug');
-
-        // --- Configuración e Inicialización de Firebase ---
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        let firebaseConfig = {};
-        // Bloque try-catch para manejar errores de parseo si la configuración no es JSON válido
-        try {
-            if (typeof __firebase_config !== 'undefined' && __firebase_config && __firebase_config !== 'null') {
-                firebaseConfig = JSON.parse(__firebase_config);
-            }
-        } catch (e) {
-            console.error("Error al parsear __firebase_config. Usando configuración vacía.", e);
-        }
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+    <!-- Script de Local Storage y Lógica -->
+    <script>
         
-        // Referencias del DOM
+        // --- Referencias del DOM ---
         const form = document.getElementById('new-tank-form');
         const activeTankContainer = document.getElementById('active-tank-display');
         const historyList = document.getElementById('history-list');
@@ -138,13 +117,40 @@
         const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
         const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
 
-        let db, auth;
-        let userId = null;
-        let isAuthReady = false;
         let tankToDeleteId = null;
 
+        // --- Funciones de Local Storage ---
+
         /**
-         * Muestra un mensaje temporal al usuario.
+         * Carga los registros de gas desde el almacenamiento local.
+         * @returns {Array<Object>} Lista de balones de gas.
+         */
+        const getTanksFromStorage = () => {
+            try {
+                const stored = localStorage.getItem('gasTanks');
+                // Devolver un array vacío si no hay datos o si falla el parseo
+                return stored ? JSON.parse(stored) : [];
+            } catch (e) {
+                console.error("Error al cargar datos de localStorage:", e);
+                return [];
+            }
+        };
+
+        /**
+         * Guarda la lista de balones de gas en el almacenamiento local.
+         * @param {Array<Object>} tanks - Lista de balones a guardar.
+         */
+        const saveTanksToStorage = (tanks) => {
+            try {
+                localStorage.setItem('gasTanks', JSON.stringify(tanks));
+            } catch (e) {
+                console.error("Error al guardar datos en localStorage:", e);
+                showMessage("Error al guardar datos. El almacenamiento local puede estar lleno.", 'error');
+            }
+        };
+
+        /**
+         * Muestra un mensaje temporal al usuario (en minúsculas/sentencia).
          * @param {string} message - El texto del mensaje.
          * @param {string} type - El tipo ('success', 'error', 'info').
          */
@@ -174,71 +180,18 @@
         // Función auxiliar para formatear fechas
         const formatDate = (isoString) => {
             if (!isoString) return 'N/A';
-            const date = new Date(isoString);
+            const date = new Date(isoString + 'T00:00:00'); // Usar T00:00:00 para evitar problemas de zona horaria
             return date.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
         };
-
-        // Función para obtener la referencia de la colección
-        const getCollectionRef = (uid) => {
-            // Path: /artifacts/{appId}/users/{userId}/balones_gas
-            return collection(db, `artifacts/${appId}/users/${uid}/balones_gas`);
-        };
-
-        /**
-         * Inicializa Firebase, autentica y configura el listener de datos.
-         */
-        async function initializeAppAndAuth() {
-            if (Object.keys(firebaseConfig).length === 0) {
-                activeTankContainer.innerHTML = '<p class="text-red-500">Error: Configuración de Firebase faltante.</p>';
-                return;
-            }
-
-            try {
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-
-                // Autenticación con token personalizado o anónima
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-
-                // Listener de estado de autenticación
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        userId = user.uid;
-                        isAuthReady = true;
-                        showMessage(`Usuario autenticado con ID: ${userId}`, 'info');
-                        startRealtimeListener();
-                    } else {
-                        // Esto no debería suceder en Canvas, pero es un fallback.
-                        userId = null;
-                        isAuthReady = false;
-                        showMessage('Autenticación fallida. Inténtelo de nuevo.', 'error');
-                    }
-                });
-
-            } catch (error) {
-                console.error("Error al inicializar Firebase o autenticar:", error);
-                activeTankContainer.innerHTML = `<p class="text-red-500">Error de conexión: ${error.message}</p>`;
-            }
-        }
         
         /**
-         * Calcula la diferencia de días entre dos fechas.
-         * @param {Date} date1 
-         * @param {Date} date2 
-         * @returns {number} Días de diferencia.
+         * Calcula la diferencia de días entre dos fechas (ISO string o Date object).
          */
         const calculateDaysDiff = (date1, date2) => {
-            // Usar la medianoche para evitar problemas de zona horaria que puedan resultar en un día de diferencia incorrecto
-            const utcDate1 = new Date(Date.UTC(date1.getFullYear(), date1.getMonth(), date1.getDate()));
-            const utcDate2 = new Date(Date.UTC(date2.getFullYear(), date2.getMonth(), date2.getDate()));
-            
-            const diffTime = Math.abs(utcDate1.getTime() - utcDate2.getTime());
-            // Convertir milisegundos a días
+            const d1 = date1 instanceof Date ? date1 : new Date(date1 + 'T00:00:00');
+            const d2 = date2 instanceof Date ? date2 : new Date(date2 + 'T00:00:00');
+
+            const diffTime = Math.abs(d1.getTime() - d2.getTime());
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             return diffDays;
         };
@@ -248,9 +201,8 @@
          * @param {Array} tanks - Lista de documentos del gas.
          */
         function renderTanks(tanks) {
-            // 1. Clasificar y ordenar los balones
-            // Ordenar por fecha de apertura (más reciente primero, si está activa)
-            const sortedTanks = tanks.sort((a, b) => new Date(b.openDate) - new Date(a.openDate));
+            // 1. Clasificar y ordenar los balones (más reciente primero)
+            const sortedTanks = [...tanks].sort((a, b) => new Date(b.openDate) - new Date(a.openDate));
             
             const activeTank = sortedTanks.find(tank => tank.status === 'active');
             const history = sortedTanks.filter(tank => tank.status === 'closed');
@@ -259,22 +211,22 @@
             const todayISO = new Date().toISOString().split('T')[0];
 
 
-            // 2. Renderizar el Balón Actual (MODIFICADO para incluir el campo de fecha de cierre)
+            // 2. Renderizar el Balón Actual
             if (activeTank) {
-                const openDate = new Date(activeTank.openDate);
-                const today = new Date();
+                const openDate = activeTank.openDate;
+                const today = new Date().toISOString().split('T')[0];
                 const currentUsageDays = calculateDaysDiff(today, openDate);
                 
                 activeTankContainer.innerHTML = `
                     <form id="close-tank-form" data-tank-id="${activeTank.id}" data-open-date="${activeTank.openDate}">
                         <div class="flex flex-col space-y-2 text-lg mb-4">
-                            <p><strong>Días de Uso Actual:</strong> <span class="text-blue-600 font-bold text-2xl">${currentUsageDays} días</span></p>
+                            <p><strong>Días de uso actual:</strong> <span class="text-blue-600 font-bold text-2xl">${currentUsageDays} días</span></p>
                             <p><span class="text-gray-500">Comprado:</span> ${formatDate(activeTank.purchaseDate)}</p>
                             <p><span class="text-gray-500">Abierto:</span> ${formatDate(activeTank.openDate)}</p>
                         </div>
                         
                         <div class="space-y-3 pt-3 border-t border-gray-100">
-                            <label for="closeDateManual" class="block text-sm font-medium text-gray-700">Fecha de cierre Manual</label>
+                            <label for="closeDateManual" class="block text-sm font-medium text-gray-700">Fecha de cierre manual</label>
                             <input type="date" id="closeDateManual" required 
                                    value="${todayISO}"
                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-red-500 focus:border-red-500">
@@ -282,7 +234,7 @@
 
                         <button type="submit" id="close-tank-submit-btn"
                                 class="ios-button mt-4 w-full bg-red-500 text-white py-3 rounded-lg hover:bg-red-600">
-                            Registrar Cierre
+                            Registrar cierre
                         </button>
                     </form>
                 `;
@@ -292,7 +244,7 @@
             } else {
                 activeTankContainer.innerHTML = `
                     <div class="p-3 bg-green-50 text-green-700 rounded-lg text-center">
-                        🎉 ¡No hay balón activo! Puedes añadir uno nuevo en la sección de abajo.
+                        ¡No hay balón activo! Puedes añadir uno nuevo en la sección de abajo.
                     </div>
                 `;
             }
@@ -302,7 +254,7 @@
                 historyList.innerHTML = history.map(tank => `
                     <div class="flex items-start justify-between p-3 border-b last:border-b-0">
                         <div class="text-sm space-y-1">
-                            <p class="font-medium text-gray-800">Días de Uso: <span class="text-indigo-600 font-semibold">${tank.usageDays}</span></p>
+                            <p class="font-medium text-gray-800">Días de uso: <span class="text-indigo-600 font-semibold">${tank.usageDays}</span></p>
                             <p class="text-xs text-gray-500"><span class="font-medium text-gray-700">Abierto:</span> ${formatDate(tank.openDate)}</p>
                             <p class="text-xs text-gray-500"><span class="font-medium text-gray-700">Cerrado:</span> ${formatDate(tank.closeDate)}</p>
                         </div>
@@ -328,38 +280,18 @@
         }
 
         /**
-         * Inicia la escucha en tiempo real de los datos de Firestore.
+         * Inicializa la aplicación cargando los datos de localStorage.
          */
-        function startRealtimeListener() {
-            if (!db || !userId) {
-                console.warn("Firestore o userId no están disponibles para iniciar el listener.");
-                return;
-            }
-
-            const tanksRef = getCollectionRef(userId);
-            
-            // onSnapshot para obtener actualizaciones en tiempo real
-            onSnapshot(tanksRef, (snapshot) => {
-                const tanks = [];
-                snapshot.forEach(doc => {
-                    tanks.push({ id: doc.id, ...doc.data() });
-                });
-                renderTanks(tanks);
-            }, (error) => {
-                console.error("Error al escuchar los datos:", error);
-                showMessage("Error al cargar datos del servidor.", 'error');
-            });
+        function initializeApp() {
+            // Inicia la aplicación cargando datos y renderizando
+            renderTanks(getTanksFromStorage());
         }
         
         /**
          * Maneja el envío del formulario para agregar un nuevo balón.
          */
-        form.addEventListener('submit', async (e) => {
+        form.addEventListener('submit', (e) => {
             e.preventDefault();
-            if (!userId) {
-                showMessage("Error de autenticación. Por favor, recargue la app.", 'error');
-                return;
-            }
 
             addTankBtn.disabled = true;
             addTankBtn.textContent = 'Guardando...';
@@ -371,11 +303,12 @@
             if (new Date(openDate) < new Date(purchaseDate)) {
                 showMessage("La fecha de apertura no puede ser anterior a la fecha de compra.", 'error');
                 addTankBtn.disabled = false;
-                addTankBtn.textContent = 'Guardar Nuevo Balón';
+                addTankBtn.textContent = 'Guardar nuevo balón';
                 return;
             }
             
             const newTank = {
+                id: Date.now().toString(), // Generar un ID simple para Local Storage
                 purchaseDate: purchaseDate, // Almacenar como string ISO Date
                 openDate: openDate,         // Almacenar como string ISO Date
                 closeDate: null,
@@ -385,22 +318,31 @@
             };
 
             try {
-                await addDoc(getCollectionRef(userId), newTank);
-                showMessage("¡Nuevo balón activo guardado con éxito!", 'success');
-                form.reset();
+                const tanks = getTanksFromStorage();
+                
+                // Comprobar si ya hay un balón activo (solo se permite uno)
+                if (tanks.some(tank => tank.status === 'active')) {
+                    showMessage("Ya existe un balón activo. Por favor, regístrelo como 'Cerrado' antes de añadir uno nuevo.", 'error');
+                } else {
+                    tanks.push(newTank);
+                    saveTanksToStorage(tanks);
+                    showMessage("Nuevo balón activo guardado con éxito.", 'success');
+                    form.reset();
+                    renderTanks(tanks);
+                }
             } catch (error) {
-                console.error("Error al agregar el documento:", error);
+                console.error("Error al agregar el balón a localStorage:", error);
                 showMessage("Error al guardar el nuevo balón.", 'error');
             } finally {
                 addTankBtn.disabled = false;
-                addTankBtn.textContent = 'Guardar Nuevo Balón';
+                addTankBtn.textContent = 'Guardar nuevo balón';
             }
         });
 
         /**
          * Maneja el envío del formulario para cerrar el balón activo con una fecha manual.
          */
-        async function handleCloseTankSubmit(e) {
+        function handleCloseTankSubmit(e) {
             e.preventDefault();
             
             const form = e.currentTarget;
@@ -412,10 +354,10 @@
             closeBtn.disabled = true;
             closeBtn.textContent = 'Cerrando...';
             
-            if (!userId || !tankId) {
-                showMessage("Error de autenticación o ID del balón faltante.", 'error');
+            if (!tankId) {
+                showMessage("Id del balón faltante. Recargue la aplicación.", 'error');
                 closeBtn.disabled = false;
-                closeBtn.textContent = 'Registrar Cierre';
+                closeBtn.textContent = 'Registrar cierre';
                 return;
             }
 
@@ -426,41 +368,61 @@
             if (closeDate < openDate) {
                 showMessage("La fecha de cierre no puede ser anterior a la fecha de apertura.", 'error');
                 closeBtn.disabled = false;
-                closeBtn.textContent = 'Registrar Cierre';
+                closeBtn.textContent = 'Registrar cierre';
                 return;
             }
 
             try {
-                // Recalcular los días de uso en base a la fecha de cierre manual
-                const usageDays = calculateDaysDiff(closeDate, openDate);
+                let tanks = getTanksFromStorage();
+                const tankIndex = tanks.findIndex(t => t.id === tankId);
 
-                await updateDoc(doc(db, getCollectionRef(userId).path, tankId), {
-                    closeDate: closeDateString, // Guardar la fecha manual
-                    usageDays: usageDays,
-                    status: 'closed'
-                });
-
-                showMessage(`Balón cerrado. Días de uso registrados: ${usageDays} días.`, 'success');
+                if (tankIndex > -1) {
+                    // Recalcular los días de uso en base a la fecha de cierre manual
+                    const usageDays = calculateDaysDiff(closeDateString, openDateString);
+                    
+                    // Actualizar el estado y los datos
+                    tanks[tankIndex].closeDate = closeDateString; // Guardar la fecha manual
+                    tanks[tankIndex].usageDays = usageDays;
+                    tanks[tankIndex].status = 'closed';
+                    
+                    saveTanksToStorage(tanks);
+                    showMessage(`Balón cerrado. Días de uso registrados: ${usageDays} días.`, 'success');
+                    renderTanks(tanks);
+                } else {
+                    showMessage("Balón activo no encontrado.", 'error');
+                }
 
             } catch (error) {
-                console.error("Error al registrar el cierre del balón:", error);
+                console.error("Error al registrar el cierre del balón en localStorage:", error);
                 showMessage("Error al cerrar el balón de gas.", 'error');
             } finally {
                 closeBtn.disabled = false;
-                closeBtn.textContent = 'Registrar Cierre';
+                closeBtn.textContent = 'Registrar cierre';
             }
         }
         
         // --- Lógica del Modal de Eliminación ---
 
-        confirmDeleteBtn.addEventListener('click', async () => {
-            if (!userId || !tankToDeleteId) return;
+        confirmDeleteBtn.addEventListener('click', () => {
+            if (!tankToDeleteId) return;
 
             try {
-                await deleteDoc(doc(db, getCollectionRef(userId).path, tankToDeleteId));
-                showMessage("Registro eliminado con éxito.", 'success');
+                let tanks = getTanksFromStorage();
+                const initialLength = tanks.length;
+                
+                // Filtrar y guardar solo los que NO coinciden con el ID
+                tanks = tanks.filter(t => t.id !== tankToDeleteId);
+                
+                if (tanks.length < initialLength) {
+                    saveTanksToStorage(tanks);
+                    showMessage("Registro eliminado con éxito.", 'success');
+                    renderTanks(tanks);
+                } else {
+                    showMessage("Error: Registro no encontrado para eliminar.", 'error');
+                }
+
             } catch (error) {
-                console.error("Error al eliminar el documento:", error);
+                console.error("Error al eliminar el documento de localStorage:", error);
                 showMessage("Error al eliminar el registro.", 'error');
             } finally {
                 tankToDeleteId = null;
@@ -476,7 +438,7 @@
         });
 
         // Iniciar la aplicación al cargar la página
-        initializeAppAndAuth();
+        initializeApp();
         
     </script>
 </body>
