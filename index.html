@@ -7,7 +7,7 @@
     <!-- Configuración para PWA en iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="Gas">
+    <meta name="apple-mobile-web-app-title" content="Gas Tracker">
     <!-- --- Íconos (Actualizado para representar 'gas.png' con un placeholder) --- -->
     <link rel="apple-touch-icon" href="gas.png">
     <link rel="icon" href="gas.png">
@@ -81,7 +81,12 @@
 
         <!-- Historial de Registros -->
         <div class="ios-card p-4">
-            <h2 class="text-2xl font-semibold mb-4 text-gray-800">Historial de uso</h2>
+            <h2 class="text-2xl font-semibold mb-4 text-gray-800 flex justify-between items-center">
+                Historial de uso
+                <button id="export-history-btn" class="ios-button text-sm bg-gray-200 text-gray-700 px-3 py-1 rounded-full hover:bg-gray-300">
+                    Exportar
+                </button>
+            </h2>
             <div id="history-list" class="space-y-3">
                 <!-- Se llenará con los registros históricos -->
                 <p class="text-gray-500 italic">El historial aparecerá aquí.</p>
@@ -105,6 +110,23 @@
         </div>
     </div>
 
+    <!-- Modal para Exportar Texto -->
+    <div id="export-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center p-4 z-50">
+        <div class="ios-card p-6 w-full max-w-lg">
+            <h3 class="text-xl font-semibold mb-4">Copiar historial</h3>
+            <p class="text-gray-700 mb-4 text-sm">Copia el texto siguiente y pégalo en tu aplicación de notas.</p>
+            <textarea id="export-textarea" readonly class="w-full h-40 p-3 mb-4 border border-gray-300 rounded-lg bg-gray-50 text-sm font-mono"></textarea>
+            <div class="flex justify-end space-x-3">
+                <button id="copy-history-btn" class="ios-button px-4 py-2 text-white bg-blue-500 rounded-lg hover:bg-blue-600">
+                    Copiar al portapapeles
+                </button>
+                <button id="close-export-modal-btn" class="ios-button px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
 
     <!-- Script de Local Storage y Lógica -->
     <script>
@@ -118,6 +140,13 @@
         const deleteModal = document.getElementById('delete-modal');
         const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
         const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+        // --- Nuevas Referencias del DOM para Exportación ---
+        const exportHistoryBtn = document.getElementById('export-history-btn');
+        const exportModal = document.getElementById('export-modal');
+        const exportTextarea = document.getElementById('export-textarea');
+        const copyHistoryBtn = document.getElementById('copy-history-btn');
+        const closeExportModalBtn = document.getElementById('close-export-modal-btn');
+
 
         let tankToDeleteId = null;
 
@@ -439,10 +468,108 @@
             deleteModal.classList.remove('flex');
         });
 
+        // --- Funciones y Eventos de Exportación ---
+        
+        /**
+         * Función para generar el texto plano del historial.
+         */
+        const generatePlainTextHistory = (tanks) => {
+            const history = tanks.filter(tank => tank.status === 'closed');
+            // Ordenar por fecha de cierre, más reciente primero
+            const sortedHistory = [...history].sort((a, b) => new Date(b.closeDate) - new Date(a.closeDate));
+
+            if (sortedHistory.length === 0) {
+                return "No hay registros históricos para exportar.";
+            }
+
+            let text = "--- Registro Histórico de Balones de Gas ---\n\n";
+
+            sortedHistory.forEach((tank, index) => {
+                // Número de registro descendente
+                const recordNumber = sortedHistory.length - index; 
+                text += `Registro #${recordNumber}\n`;
+                text += `  Días de uso: ${tank.usageDays} días\n`;
+                text += `  Abierto: ${formatDate(tank.openDate)}\n`;
+                text += `  Cerrado: ${formatDate(tank.closeDate)}\n`;
+                text += `  Comprado: ${formatDate(tank.purchaseDate)}\n`;
+                text += "--------------------------------------\n";
+            });
+            
+            return text;
+        };
+        
+        // Función de copia de respaldo (fallback)
+        function fallbackCopy(textareaElement) {
+            textareaElement.select();
+            textareaElement.setSelectionRange(0, 99999); // Para móviles
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    copyHistoryBtn.textContent = '¡Copiado (fallback)!';
+                    showMessage("Historial copiado al portapapeles (método antiguo).", 'success');
+                } else {
+                    copyHistoryBtn.textContent = 'Error al copiar';
+                    showMessage("Error: No se pudo copiar el texto. Seleccione y copie manualmente.", 'error');
+                }
+            } catch (err) {
+                copyHistoryBtn.textContent = 'Error al copiar';
+                showMessage("Error: No se pudo copiar el texto. Seleccione y copie manualmente.", 'error');
+            }
+            setTimeout(() => {
+                copyHistoryBtn.textContent = 'Copiar al portapapeles';
+                exportModal.classList.add('hidden');
+                exportModal.classList.remove('flex');
+            }, 1500);
+        }
+
+        // Evento para abrir el modal de exportación
+        exportHistoryBtn.addEventListener('click', () => {
+            const tanks = getTanksFromStorage();
+            const plainText = generatePlainTextHistory(tanks);
+            
+            exportTextarea.value = plainText;
+            exportModal.classList.remove('hidden');
+            exportModal.classList.add('flex');
+            
+            // Si no hay historial, deshabilitar el botón de copiar
+            copyHistoryBtn.disabled = plainText.includes("No hay registros");
+            copyHistoryBtn.textContent = copyHistoryBtn.disabled ? 'Sin datos para copiar' : 'Copiar al portapapeles';
+        });
+
+        // Evento para copiar el texto al portapapeles
+        copyHistoryBtn.addEventListener('click', () => {
+            const textToCopy = exportTextarea.value;
+            
+            // Intentar usar la API moderna (más compatible en móviles modernos)
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    copyHistoryBtn.textContent = '¡Copiado!';
+                    showMessage("Historial copiado al portapapeles.", 'success');
+                    setTimeout(() => {
+                        copyHistoryBtn.textContent = 'Copiar al portapapeles';
+                        exportModal.classList.add('hidden'); // Cierra automáticamente
+                        exportModal.classList.remove('flex');
+                    }, 1500);
+                }).catch(err => {
+                    console.error('Error al copiar (API):', err);
+                    // Fallback en caso de error o permisos denegados
+                    fallbackCopy(exportTextarea);
+                });
+            } else {
+                // Fallback para navegadores antiguos
+                fallbackCopy(exportTextarea);
+            }
+        });
+
+        // Evento para cerrar el modal de exportación
+        closeExportModalBtn.addEventListener('click', () => {
+            exportModal.classList.add('hidden');
+            exportModal.classList.remove('flex');
+        });
+
         // Iniciar la aplicación al cargar la página
         initializeApp();
         
     </script>
 </body>
 </html>
-
