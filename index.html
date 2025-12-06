@@ -7,10 +7,10 @@
     <!-- Configuración para PWA en iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="Gas">
+    <meta name="apple-mobile-web-app-title" content="Gas Tracker">
     <!-- --- Íconos (Actualizado para representar 'gas.png' con un placeholder) --- -->
-    <link rel="apple-touch-icon" href="https://placehold.co/180x180/007AFF/ffffff?text=GAS">
-    <link rel="icon" href="https://placehold.co/32x32/007AFF/ffffff?text=G">
+    <link rel="apple-touch-icon" href="gas.png">
+    <link rel="icon" href="gas.png">
     
     <!-- Tailwind CSS CDN para un estilo limpio y adaptable -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -446,7 +446,7 @@
             deleteModal.classList.remove('flex');
         });
 
-        // --- Funciones y Eventos de Exportación (Actualizados para TXT) ---
+        // --- Funciones y Eventos de Exportación (Generación y descarga de TXT) ---
         
         /**
          * Función para generar el texto plano del historial.
