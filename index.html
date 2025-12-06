@@ -7,10 +7,10 @@
     <!-- Configuración para PWA en iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="Gas Tracker">
+    <meta name="apple-mobile-web-app-title" content="Gas">
     <!-- --- Íconos (Actualizado para representar 'gas.png' con un placeholder) --- -->
-    <link rel="apple-touch-icon" href="gas.png">
-    <link rel="icon" href="gas.png">
+    <link rel="apple-touch-icon" href="https://placehold.co/180x180/007AFF/ffffff?text=GAS">
+    <link rel="icon" href="https://placehold.co/32x32/007AFF/ffffff?text=G">
     
     <!-- Tailwind CSS CDN para un estilo limpio y adaptable -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -110,24 +110,6 @@
         </div>
     </div>
 
-    <!-- Modal para Exportar Texto -->
-    <div id="export-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center p-4 z-50">
-        <div class="ios-card p-6 w-full max-w-lg">
-            <h3 class="text-xl font-semibold mb-4">Copiar historial</h3>
-            <p class="text-gray-700 mb-4 text-sm">Copia el texto siguiente y pégalo en tu aplicación de notas.</p>
-            <textarea id="export-textarea" readonly class="w-full h-40 p-3 mb-4 border border-gray-300 rounded-lg bg-gray-50 text-sm font-mono"></textarea>
-            <div class="flex justify-end space-x-3">
-                <button id="copy-history-btn" class="ios-button px-4 py-2 text-white bg-blue-500 rounded-lg hover:bg-blue-600">
-                    Copiar al portapapeles
-                </button>
-                <button id="close-export-modal-btn" class="ios-button px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">
-                    Cerrar
-                </button>
-            </div>
-        </div>
-    </div>
-
-
     <!-- Script de Local Storage y Lógica -->
     <script>
         
@@ -140,12 +122,8 @@
         const deleteModal = document.getElementById('delete-modal');
         const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
         const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
-        // --- Nuevas Referencias del DOM para Exportación ---
+        // --- Referencia del DOM para Exportación ---
         const exportHistoryBtn = document.getElementById('export-history-btn');
-        const exportModal = document.getElementById('export-modal');
-        const exportTextarea = document.getElementById('export-textarea');
-        const copyHistoryBtn = document.getElementById('copy-history-btn');
-        const closeExportModalBtn = document.getElementById('close-export-modal-btn');
 
 
         let tankToDeleteId = null;
@@ -181,7 +159,7 @@
         };
 
         /**
-         * Muestra un mensaje temporal al usuario (en minúsculas/sentencia).
+         * Muestra un mensaje temporal al usuario.
          * @param {string} message - El texto del mensaje.
          * @param {string} type - El tipo ('success', 'error', 'info').
          */
@@ -468,7 +446,7 @@
             deleteModal.classList.remove('flex');
         });
 
-        // --- Funciones y Eventos de Exportación ---
+        // --- Funciones y Eventos de Exportación (Actualizados para TXT) ---
         
         /**
          * Función para generar el texto plano del historial.
@@ -498,74 +476,50 @@
             return text;
         };
         
-        // Función de copia de respaldo (fallback)
-        function fallbackCopy(textareaElement) {
-            textareaElement.select();
-            textareaElement.setSelectionRange(0, 99999); // Para móviles
-            try {
-                const successful = document.execCommand('copy');
-                if (successful) {
-                    copyHistoryBtn.textContent = '¡Copiado (fallback)!';
-                    showMessage("Historial copiado al portapapeles (método antiguo).", 'success');
-                } else {
-                    copyHistoryBtn.textContent = 'Error al copiar';
-                    showMessage("Error: No se pudo copiar el texto. Seleccione y copie manualmente.", 'error');
-                }
-            } catch (err) {
-                copyHistoryBtn.textContent = 'Error al copiar';
-                showMessage("Error: No se pudo copiar el texto. Seleccione y copie manualmente.", 'error');
-            }
-            setTimeout(() => {
-                copyHistoryBtn.textContent = 'Copiar al portapapeles';
-                exportModal.classList.add('hidden');
-                exportModal.classList.remove('flex');
-            }, 1500);
-        }
-
-        // Evento para abrir el modal de exportación
-        exportHistoryBtn.addEventListener('click', () => {
+        /**
+         * Maneja el proceso de exportación: genera un Blob y fuerza la descarga de un archivo .txt.
+         */
+        const handleExportToTXT = () => {
             const tanks = getTanksFromStorage();
             const plainText = generatePlainTextHistory(tanks);
-            
-            exportTextarea.value = plainText;
-            exportModal.classList.remove('hidden');
-            exportModal.classList.add('flex');
-            
-            // Si no hay historial, deshabilitar el botón de copiar
-            copyHistoryBtn.disabled = plainText.includes("No hay registros");
-            copyHistoryBtn.textContent = copyHistoryBtn.disabled ? 'Sin datos para copiar' : 'Copiar al portapapeles';
-        });
 
-        // Evento para copiar el texto al portapapeles
-        copyHistoryBtn.addEventListener('click', () => {
-            const textToCopy = exportTextarea.value;
-            
-            // Intentar usar la API moderna (más compatible en móviles modernos)
-            if (navigator.clipboard) {
-                navigator.clipboard.writeText(textToCopy).then(() => {
-                    copyHistoryBtn.textContent = '¡Copiado!';
-                    showMessage("Historial copiado al portapapeles.", 'success');
-                    setTimeout(() => {
-                        copyHistoryBtn.textContent = 'Copiar al portapapeles';
-                        exportModal.classList.add('hidden'); // Cierra automáticamente
-                        exportModal.classList.remove('flex');
-                    }, 1500);
-                }).catch(err => {
-                    console.error('Error al copiar (API):', err);
-                    // Fallback en caso de error o permisos denegados
-                    fallbackCopy(exportTextarea);
-                });
-            } else {
-                // Fallback para navegadores antiguos
-                fallbackCopy(exportTextarea);
+            if (plainText.includes("No hay registros")) {
+                showMessage(plainText, 'info');
+                return;
             }
-        });
 
-        // Evento para cerrar el modal de exportación
-        closeExportModalBtn.addEventListener('click', () => {
-            exportModal.classList.add('hidden');
-            exportModal.classList.remove('flex');
-        });
+            try {
+                // 1. Crear el Blob (objeto binario que representa los datos del archivo)
+                const blob = new Blob([plainText], { type: 'text/plain;charset=utf-8' });
+
+                // 2. Crear un enlace temporal
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                
+                // 3. Configurar el enlace como una descarga de archivo
+                a.href = url;
+                // Nombrar el archivo con la fecha actual
+                a.download = `Registro_Gas_${new Date().toISOString().split('T')[0]}.txt`; 
+                
+                // 4. Simular el clic para iniciar la descarga
+                document.body.appendChild(a); // Es necesario que esté en el DOM para que el clic funcione en algunos navegadores
+                a.click();
+                document.body.removeChild(a);
+
+                // 5. Limpiar el URL del objeto Blob
+                URL.revokeObjectURL(url);
+                showMessage("Archivo TXT generado y descargado. Utiliza el menú 'Abrir con' para abrirlo en Notas.", 'success');
+
+            } catch (e) {
+                console.error("Error al exportar TXT:", e);
+                showMessage("Error al generar el archivo de exportación. Inténtalo de nuevo.", 'error');
+            }
+        };
+
+
+        // Evento para iniciar la exportación TXT
+        exportHistoryBtn.addEventListener('click', handleExportToTXT);
+
 
         // Iniciar la aplicación al cargar la página
         initializeApp();
